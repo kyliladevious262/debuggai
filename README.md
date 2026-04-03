@@ -4,73 +4,72 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/rish-e/debuggai/actions"><img src="https://img.shields.io/github/actions/workflow/status/rish-e/debuggai/ci.yml?branch=main" alt="CI"></a>
-  <a href="https://pypi.org/project/debuggai/"><img src="https://img.shields.io/pypi/v/debuggai" alt="PyPI"></a>
   <a href="https://github.com/rish-e/debuggai/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rish-e/debuggai" alt="License"></a>
-  <a href="https://pypi.org/project/debuggai/"><img src="https://img.shields.io/pypi/pyversions/debuggai" alt="Python"></a>
+  <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
 </p>
 
 ---
 
-AI-generated code has **1.7x more bugs** than human-written code. 88% of developers don't trust it enough to deploy. DebuggAI is a specialized diagnostic engine that catches the bugs AI coding tools introduce — hallucinated APIs, security vulnerabilities, performance anti-patterns, and intent mismatches — before they reach production.
+AI-generated code has **1.7x more bugs** than human-written code. DebuggAI catches them — hallucinated APIs, security vulnerabilities, performance anti-patterns, and intent mismatches — before they reach production.
 
-## Why DebuggAI?
+---
 
-Traditional linters and test tools weren't designed for AI-generated code. They miss the failure modes that AI coding tools specifically produce:
+## How to Use
 
-| Problem | How Often in AI Code | DebuggAI Detection |
-|---------|---------------------|-------------------|
-| Hallucinated imports (non-existent packages) | Very common | AST + dependency resolution |
-| XSS vulnerabilities | 2.74x more likely | Pattern + AST analysis |
-| Excessive I/O operations | 8x more frequent | AST loop analysis |
-| Hardcoded secrets | 1.88x more likely | Regex + entropy detection |
-| Missing error handling | 1.75x more frequent | LLM semantic review |
-| Intent mismatches | Universal | Prompt Fidelity scoring |
+There are **two ways** to use DebuggAI. Pick whichever fits your workflow.
 
-## Install
+### Option A: Inside Claude Code / Cursor (recommended)
+
+Use DebuggAI without leaving your AI coding workflow. Just talk naturally.
+
+**One-time setup:**
 
 ```bash
 pip install debuggai
+debuggai setup
 ```
 
-Requires Python 3.10+. That's it — no npm, no extra downloads.
+Then **restart Claude Code** (or Cursor).
 
-### Setup for Claude Code / Cursor (one command)
+**That's it.** Now just ask Claude:
+
+- *"scan this project for bugs"*
+- *"scan src/app.py for security issues"*  
+- *"verify this code matches: add user authentication with OAuth"*
+- *"check my staged changes before I commit"*
+
+Claude will use DebuggAI's tools automatically. No commands to memorize — just describe what you want.
+
+### Option B: Terminal CLI
+
+Run scans directly from your terminal.
 
 ```bash
-debuggai setup              # Claude Code (default)
-debuggai setup --cursor     # Cursor
-```
+# Go to any project
+cd ~/my-project
 
-This auto-registers DebuggAI as an MCP server. Restart your IDE, then use `/scan`, `/verify`, and `/init` as slash commands.
-
-## Quick Start
-
-```bash
-# Initialize DebuggAI in your project (auto-detects languages)
-debuggai init
-
-# Scan for issues
-debuggai scan
+# Scan everything
+debuggai scan --no-llm
 
 # Scan a specific file
 debuggai scan --file src/app.py
 
-# Scan git changes since last commit
+# Scan what changed since last commit
 debuggai scan --diff HEAD~1
 
-# Scan only staged changes (great for pre-commit)
+# Scan staged changes (great before committing)
 debuggai scan --staged
 
-# Verify code matches what you asked the AI to build
-debuggai verify --intent "add user authentication with Google OAuth"
+# Verify code matches what you asked AI to build
+debuggai verify --intent "add Google OAuth login"
 ```
+
+---
 
 ## What It Catches
 
-### 1. Hallucinated Imports
-
-AI tools frequently generate imports for packages that don't exist. DebuggAI resolves the full dependency tree (pip, npm, cargo) and flags imports that can't be found.
+### Hallucinated Imports
+AI tools make up packages that don't exist. DebuggAI checks your actual dependency tree.
 
 ```
 !!! [IMPORT] Hallucinated import: fastapi_magic_router  src/app.py:4
@@ -78,9 +77,8 @@ AI tools frequently generate imports for packages that don't exist. DebuggAI res
    Fix: Verify that 'fastapi_magic_router' exists. Install it or remove the import.
 ```
 
-### 2. Security Vulnerabilities
-
-15 security patterns tuned for AI-generated code — XSS, SQL injection, hardcoded secrets, eval usage, command injection, insecure deserialization, and more.
+### Security Vulnerabilities
+15 patterns tuned for AI code — XSS, SQL injection, hardcoded secrets, eval, command injection, and more.
 
 ```
 !!! [SECURITY] SQL injection vulnerability  src/db.py:17
@@ -88,9 +86,8 @@ AI tools frequently generate imports for packages that don't exist. DebuggAI res
    Fix: Use parameterized queries: cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))
 ```
 
-### 3. Performance Anti-Patterns
-
-Detects O(n²) nested loops, I/O operations inside loops, synchronous blocking calls, and N+1 query patterns.
+### Performance Anti-Patterns
+O(n²) loops, I/O inside loops, sync blocking calls, N+1 queries.
 
 ```
  !! [PERFORMANCE] I/O operation in loop: requests.get  src/sync.py:39
@@ -98,18 +95,16 @@ Detects O(n²) nested loops, I/O operations inside loops, synchronous blocking c
    Fix: Batch I/O operations outside the loop, or use async/concurrent patterns.
 ```
 
-### 4. LLM-Powered Semantic Review
-
-Sends code to Claude for deep analysis of logic errors, incomplete error handling, architectural drift, and dead code from AI iteration. Requires an Anthropic API key.
+### LLM-Powered Deep Review
+Sends code to Claude for semantic analysis — logic errors, incomplete error handling, architectural drift, dead code. Requires an Anthropic API key.
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 debuggai scan --file src/app.py
 ```
 
-### 5. Intent Verification (Prompt Fidelity Score)
-
-Compares what you asked the AI to build against what was actually built. Extracts testable assertions from your intent and scores each one.
+### Intent Verification
+Compares what you asked the AI to build vs. what was actually built. Gives you a **Prompt Fidelity Score**.
 
 ```bash
 debuggai verify --intent "add user auth with Google OAuth" --file src/
@@ -124,7 +119,33 @@ Prompt Fidelity Score: 65/100
 [+] Redirect to login page implemented
 ```
 
+---
+
+## Why DebuggAI?
+
+Traditional linters weren't designed for AI-generated code. They miss what AI specifically gets wrong:
+
+| Problem | How Often in AI Code | DebuggAI Detection |
+|---------|---------------------|-------------------|
+| Hallucinated imports (non-existent packages) | Very common | AST + dependency resolution |
+| XSS vulnerabilities | 2.74x more likely | Pattern + AST analysis |
+| Excessive I/O operations | 8x more frequent | AST loop analysis |
+| Hardcoded secrets | 1.88x more likely | Regex + entropy detection |
+| Missing error handling | 1.75x more frequent | LLM semantic review |
+| Intent mismatches | Universal | Prompt Fidelity scoring |
+
+---
+
 ## CLI Reference
+
+### `debuggai setup`
+
+Auto-registers DebuggAI as an MCP server in Claude Code or Cursor. Run once.
+
+```bash
+debuggai setup              # Claude Code (default)
+debuggai setup --cursor     # Cursor
+```
 
 ### `debuggai init [directory]`
 
@@ -140,13 +161,11 @@ Scan code for AI-generated bugs.
 | `--diff, -d` | Git ref to diff against (e.g., `HEAD~1`) |
 | `--staged, -s` | Scan staged changes only |
 | `--intent, -i` | Intent to verify alongside scan |
-| `--spec` | Path to intent spec file |
 | `--no-llm` | Skip LLM analysis (faster, no API key needed) |
 | `--format, -o` | Output format: `terminal`, `markdown`, `json` |
 | `--strict` | Report all severities including minor and info |
-| `--config` | Path to config file |
 
-**Exit codes**: 0 = clean, 1 = major issues found, 2 = critical issues found.
+Exit codes: 0 = clean, 1 = major issues, 2 = critical issues.
 
 ### `debuggai verify`
 
@@ -163,6 +182,8 @@ Verify code against a natural language intent.
 
 Show current DebuggAI configuration.
 
+---
+
 ## Configuration
 
 Create a `.debuggai.yaml` in your project root (or run `debuggai init`):
@@ -170,77 +191,26 @@ Create a `.debuggai.yaml` in your project root (or run `debuggai init`):
 ```yaml
 project:
   name: "my-project"
-  type: "fullstack"    # fullstack | backend | frontend | creative
+  type: "fullstack"
 
 code:
   languages: [python, typescript]
-  strictness: medium   # low | medium | high
+  strictness: medium   # low (critical only) | medium (default) | high (everything)
   ignore:
     - "*.test.*"
     - "node_modules/"
-    - "__pycache__/"
   rules:
     security: true
     performance: true
     ai_patterns: true
 
-intent:
-  sources:
-    - git_commits
-    - pr_descriptions
-    - spec_files
-
 reporting:
-  format: markdown     # terminal | markdown | json
+  format: markdown
   severity_threshold: minor
-  output: stdout       # stdout | file | both
+  output: stdout
 ```
 
-### Strictness Levels
-
-| Level | What gets reported |
-|-------|-------------------|
-| `low` | Critical only |
-| `medium` | Critical + Major (default) |
-| `high` | Everything including Minor and Info |
-
-## MCP Server
-
-DebuggAI includes a built-in Python MCP server — no npm or Node.js required.
-
-```bash
-# Auto-install (recommended)
-debuggai setup
-
-# Or manual config — add to your MCP settings:
-```
-
-```json
-{
-  "mcpServers": {
-    "debuggai": {
-      "command": "debuggai-mcp"
-    }
-  }
-}
-```
-
-**Available tools:**
-
-| Tool | Description |
-|------|-------------|
-| `scan_code` | Scan code for AI-generated bugs |
-| `verify_intent` | Verify code matches intent, get Prompt Fidelity Score |
-| `get_report` | Get full JSON report for programmatic analysis |
-| `init_project` | Initialize DebuggAI config for a project |
-
-**Slash commands** (after `debuggai setup`):
-
-| Command | Description |
-|---------|-------------|
-| `/scan` | Scan current project for bugs |
-| `/verify` | Verify code matches intent |
-| `/init` | Initialize DebuggAI config |
+---
 
 ## CI/CD Integration
 
@@ -257,31 +227,10 @@ debuggai setup
 ### Pre-commit Hook
 
 ```bash
-# In your pre-commit script or .husky/pre-commit
 debuggai scan --staged --no-llm
 ```
 
-## Architecture
-
-```
-debuggai/
-├── engines/
-│   ├── code/          # Code QA Engine
-│   │   ├── imports.py     # Hallucinated import detector
-│   │   ├── security.py    # Security vulnerability scanner
-│   │   ├── performance.py # Performance anti-pattern detector
-│   │   ├── llm_review.py  # LLM-powered semantic review
-│   │   └── scanner.py     # Orchestrates all code analyzers
-│   ├── intent/        # Intent Verification Engine
-│   │   ├── capture.py     # Intent capture from CLI/git/files
-│   │   ├── parser.py      # Assertion extraction via LLM
-│   │   └── scorer.py      # Prompt Fidelity scoring
-│   └── creative/      # Creative Output QA (coming in v1.0)
-├── models/            # Pydantic data models
-├── reports/           # Report generation (JSON, Markdown, terminal)
-├── utils/             # Git, LLM, and FFmpeg utilities
-└── cli.py             # Click CLI entry point
-```
+---
 
 ## Supported Languages
 
