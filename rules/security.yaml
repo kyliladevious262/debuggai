@@ -1,0 +1,27 @@
+rules:
+  - id: jwt-secret-hardcoded
+    regex: 'jwt\.sign\s*\([^)]*,\s*["\'][^"\']{8,}'
+    languages: [javascript, typescript]
+    severity: critical
+    category: security
+    message: "JWT signed with hardcoded secret"
+    description: "JWT secret is hardcoded in source. If leaked, anyone can forge tokens."
+    suggestion: "Use an environment variable: process.env.JWT_SECRET"
+
+  - id: bcrypt-low-rounds
+    regex: 'bcrypt\.\w+\([^)]*,\s*[1-7]\s*[,)]'
+    languages: [javascript, typescript, python]
+    severity: major
+    category: security
+    message: "bcrypt rounds too low (< 8)"
+    description: "Low bcrypt rounds make password hashes easy to brute-force."
+    suggestion: "Use at least 10 rounds: bcrypt.hash(password, 10)"
+
+  - id: debug-mode-production
+    regex: 'DEBUG\s*=\s*True'
+    languages: [python]
+    severity: major
+    category: security
+    message: "Debug mode enabled"
+    description: "DEBUG=True exposes stack traces and sensitive info to users."
+    suggestion: "Set DEBUG=False in production, use environment variable."

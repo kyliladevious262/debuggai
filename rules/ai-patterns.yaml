@@ -1,0 +1,26 @@
+rules:
+  - id: todo-fixme-left
+    regex: '(?:TODO|FIXME|HACK|XXX|TEMP)[\s:]+.*'
+    severity: info
+    category: ai_pattern
+    message: "TODO/FIXME left in code"
+    description: "AI tools often leave TODO comments that never get addressed."
+    suggestion: "Implement the TODO or remove it if no longer needed."
+
+  - id: console-log-left
+    regex: 'console\.log\s*\('
+    languages: [javascript, typescript]
+    severity: minor
+    category: ai_pattern
+    message: "console.log left in code"
+    description: "AI tools frequently add console.log for debugging that should be removed."
+    suggestion: "Remove console.log or replace with a proper logging library."
+    regex-not: '//.*console\.log'
+
+  - id: commented-out-code
+    regex: '^\s*(?://|#)\s*(?:const|let|var|function|def|class|import|from|if|for|while|return)\s'
+    severity: minor
+    category: ai_pattern
+    message: "Commented-out code"
+    description: "AI iteration often leaves commented-out code blocks. Use version control instead."
+    suggestion: "Delete commented-out code. It's preserved in git history if needed."

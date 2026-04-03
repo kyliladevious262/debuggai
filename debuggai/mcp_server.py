@@ -134,6 +134,116 @@ def init_project(directory: str = ".") -> str:
     )
 
 
+@mcp.tool()
+def fix_issues(
+    target: str = ".",
+    min_confidence: float = 0.7,
+    auto_apply: bool = False,
+) -> str:
+    """Generate fixes for detected issues. Optionally auto-apply high-confidence fixes.
+
+    Args:
+        target: File or directory to fix
+        min_confidence: Minimum confidence threshold for fixes (0.0-1.0)
+        auto_apply: If True, automatically apply fixes to files
+    """
+    from debuggai.config import load_config
+    from debuggai.orchestrator import run_scan
+    from debuggai.engines.fix import generate_fixes_for_issues, apply_fix
+
+    cfg = load_config()
+    if not cfg.anthropic_api_key:
+        return "Auto-fix requires ANTHROPIC_API_KEY environment variable."
+
+    report = run_scan(target=target if target != "." else None, use_llm=False)
+    if not report.issues:
+        return "No issues found — nothing to fix!"
+
+    project_dir = str(Path(target).resolve()) if Path(target).is_dir() else str(Path.cwd())
+    fixes = generate_fixes_for_issues(
+        report.issues, project_dir, api_key=cfg.anthropic_api_key, min_confidence=min_confidence,
+    )
+
+    if not fixes:
+        return f"Found {len(report.issues)} issues but could not generate fixes."
+
+    result = f"Generated {len(fixes)} fixes:\n\n"
+    for i, f in enumerate(fixes):
+        result += f"**Fix {i+1}** (confidence: {f['confidence']:.0%})\n"
+        result += f"[{f['severity'].upper()}] {f['issue_title']} — {f['file']}:{f['line']}\n"
+        result += f"{f['explanation']}\n"
+        if f.get("old_code") and f.get("new_code"):
+            result += f"```diff\n- {f['old_code']}\n+ {f['new_code']}\n```\n"
+
+        if auto_apply:
+            if apply_fix(f, project_dir):
+                result += "Applied successfully.\n"
+            else:
+                result += "Failed to apply.\n"
+        result += "\n"
+
+    return result
+
+
+@mcp.tool()
+def show_history(limit: int = 10) -> str:
+    """Show scan history and quality trends for the current project.
+
+    Args:
+        limit: Number of recent scans to show
+    """
+    from debuggai.storage import get_db, get_scan_history, get_quality_delta
+
+    db = get_db()
+    scans = get_scan_history(db, limit=limit)
+    delta = get_quality_delta(db, project=scans[0]["project"] if scans else "")
+    db.close()
+
+    if not scans:
+        return "No scan history yet. Run a scan first."
+
+    result = "DebuggAI Scan History\n\n"
+
+    if delta:
+        d = delta
+        result += f"Since last scan: {d['delta_total']:+d} issues ({d['new_issues']} new, {d['fixed_issues']} fixed)\n\n"
+
+    result += f"{'Timestamp':<22} {'Issues':>6} {'Crit':>5} {'Major':>6}\n"
+    result += f"{'─'*22} {'─'*6} {'─'*5} {'─'*6}\n"
+    for s in scans:
+        ts = s["timestamp"][:19] if s["timestamp"] else "?"
+        result += f"{ts:<22} {s['total_issues']:>6} {s['critical']:>5} {s['major']:>6}\n"
+
+    return result
+
+
+@mcp.tool()
+def dismiss_rule(rule_id: str, file_pattern: str | None = None, reason: str = "") -> str:
+    """Dismiss an issue rule. After 3 dismissals of the same rule, it auto-suppresses.
+
+    Args:
+        rule_id: The rule ID to dismiss (e.g., "xss-innerhtml", "nested-loop-on2")
+        file_pattern: Only dismiss for files matching this pattern
+        reason: Why this rule is being dismissed
+    """
+    from debuggai.storage import get_db, dismiss_issue, get_dismissals
+
+    db = get_db()
+    dismiss_issue(db, rule_id, file_pattern, reason)
+    dismissals = get_dismissals(db)
+    db.close()
+
+    for d in dismissals:
+        if d["rule_id"] == rule_id:
+            if d["auto_suppress"]:
+                return f"Rule '{rule_id}' is now auto-suppressed (dismissed {d['count']}x). It won't appear in future scans."
+            else:
+                remaining = 3 - d["count"]
+                return f"Rule '{rule_id}' dismissed ({d['count']}x). {remaining} more dismissal(s) to auto-suppress."
+
+    return f"Rule '{rule_id}' dismissed."
+
+
 # ─── Prompts (slash commands) ─────────────────────────────────────────────────
 
 
@@ -166,6 +276,25 @@ def init(directory: str = ".") -> str:
     return (
         f'Run the init_project tool with directory="{directory}". '
         "Show the user what was detected and configured."
+    )
+
+
+@mcp.prompt()
+def fix(target: str = ".") -> str:
+    """Generate and apply fixes for detected issues."""
+    return (
+        f'Run the fix_issues tool with target="{target}". '
+        "Show each fix with its confidence score, the before/after code, and explanation. "
+        "Ask the user if they want to apply the fixes."
+    )
+
+
+@mcp.prompt()
+def history() -> str:
+    """Show scan history and quality trends."""
+    return (
+        "Run the show_history tool. Present the results as a clean table "
+        "and highlight any trends (improving or degrading quality)."
     )
 
 

@@ -16,3 +16,4 @@ mcp-server/dist/
 .debuggai-cache/
 .pytest_cache/
 .ruff_cache/
+.debuggai/

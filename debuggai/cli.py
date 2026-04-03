@@ -231,6 +231,138 @@ def setup(claude_code: bool, cursor: bool):
 
 
 @main.command()
+@click.option("--file", "-f", "target", help="File or directory to generate fixes for")
+@click.option("--diff", "-d", "diff_ref", help="Git ref to diff against")
+@click.option("--apply", is_flag=True, help="Apply all high-confidence fixes automatically")
+@click.option("--min-confidence", default=0.7, help="Minimum confidence for fixes (0.0-1.0)")
+def fix(target: str | None, diff_ref: str | None, apply: bool, min_confidence: float):
+    """Generate and optionally apply fixes for detected issues."""
+    from debuggai.orchestrator import run_scan
+    from debuggai.engines.fix import generate_fixes_for_issues, apply_fix
+
+    cfg = load_config()
+    if not cfg.anthropic_api_key:
+        console.print("[red]Auto-fix requires an Anthropic API key.[/red]")
+        console.print("Set ANTHROPIC_API_KEY environment variable.")
+        sys.exit(1)
+
+    with console.status("[bold blue]Scanning for issues...[/bold blue]"):
+        report = run_scan(target=target, diff_ref=diff_ref, use_llm=False)
+
+    if not report.issues:
+        console.print("[green]No issues found — nothing to fix![/green]")
+        return
+
+    console.print(f"Found {len(report.issues)} issues. Generating fixes...")
+
+    project_dir = str(Path(target).resolve()) if target and Path(target).is_dir() else str(Path.cwd())
+
+    with console.status("[bold blue]Generating fixes...[/bold blue]"):
+        fixes = generate_fixes_for_issues(
+            report.issues, project_dir,
+            api_key=cfg.anthropic_api_key,
+            min_confidence=min_confidence,
+        )
+
+    if not fixes:
+        console.print("[yellow]Could not generate fixes for any issues.[/yellow]")
+        return
+
+    for i, f in enumerate(fixes):
+        conf_color = "green" if f["confidence"] >= 0.8 else "yellow" if f["confidence"] >= 0.5 else "red"
+        console.print(f"\n[bold]Fix {i+1}[/bold] [{conf_color}]confidence: {f['confidence']:.0%}[/{conf_color}]")
+        console.print(f"  [{f['severity'].upper()}] {f['issue_title']}")
+        console.print(f"  [dim]{f['file']}:{f['line']}[/dim]")
+        console.print(f"  {f['explanation']}")
+        if f.get("old_code") and f.get("new_code"):
+            console.print(f"  [red]- {f['old_code'][:100]}...[/red]" if len(f['old_code']) > 100 else f"  [red]- {f['old_code']}[/red]")
+            console.print(f"  [green]+ {f['new_code'][:100]}...[/green]" if len(f['new_code']) > 100 else f"  [green]+ {f['new_code']}[/green]")
+
+    if apply:
+        console.print(f"\n[bold]Applying {len(fixes)} fixes...[/bold]")
+        applied = 0
+        for f in fixes:
+            if apply_fix(f, project_dir):
+                applied += 1
+                console.print(f"  [green]Applied:[/green] {f['file']}:{f['line']}")
+            else:
+                console.print(f"  [red]Failed:[/red] {f['file']}:{f['line']}")
+        console.print(f"\n[bold]{applied}/{len(fixes)} fixes applied.[/bold]")
+    else:
+        console.print(f"\n[dim]Run with --apply to apply these fixes.[/dim]")
+
+
+@main.command()
+@click.option("--since", default="30d", help="Time range (e.g., 7d, 30d, 90d)")
+@click.option("--format", "-o", "output_format", type=click.Choice(["terminal", "json"]), default="terminal")
+def history(since: str, output_format: str):
+    """Show scan history and quality trends for the current project."""
+    import json as json_mod
+    from debuggai.storage import get_db, get_scan_history, get_quality_delta
+
+    db = get_db()
+    scans = get_scan_history(db, limit=20)
+    delta = get_quality_delta(db, project=scans[0]["project"] if scans else "")
+    db.close()
+
+    if not scans:
+        console.print("[dim]No scan history yet. Run debuggai scan first.[/dim]")
+        return
+
+    if output_format == "json":
+        click.echo(json_mod.dumps({"scans": scans, "delta": delta}, indent=2, default=str))
+        return
+
+    console.print("[bold]DebuggAI Scan History[/bold]\n")
+
+    if delta:
+        d = delta
+        delta_str = []
+        if d["delta_total"] > 0:
+            delta_str.append(f"[red]+{d['delta_total']} issues[/red]")
+        elif d["delta_total"] < 0:
+            delta_str.append(f"[green]{d['delta_total']} issues[/green]")
+        else:
+            delta_str.append("[dim]no change[/dim]")
+        if d["new_issues"]:
+            delta_str.append(f"[red]+{d['new_issues']} new[/red]")
+        if d["fixed_issues"]:
+            delta_str.append(f"[green]-{d['fixed_issues']} fixed[/green]")
+        console.print(f"  Since last scan: {', '.join(delta_str)}\n")
+
+    console.print(f"  {'Timestamp':<22} {'Issues':>6} {'Crit':>5} {'Major':>6} {'Duration':>8}")
+    console.print(f"  {'─'*22} {'─'*6} {'─'*5} {'─'*6} {'─'*8}")
+    for s in scans[:15]:
+        ts = s["timestamp"][:19] if s["timestamp"] else "?"
+        dur = f"{s['duration_ms']}ms" if s.get("duration_ms") else "?"
+        console.print(f"  {ts:<22} {s['total_issues']:>6} {s['critical']:>5} {s['major']:>6} {dur:>8}")
+
+
+@main.command()
+@click.argument("rule_id")
+@click.option("--file-pattern", "-f", help="Only dismiss for files matching this pattern")
+@click.option("--reason", "-r", default="", help="Reason for dismissal")
+def dismiss(rule_id: str, file_pattern: str | None, reason: str):
+    """Dismiss an issue rule. After 3 dismissals, it auto-suppresses."""
+    from debuggai.storage import get_db, dismiss_issue, get_dismissals
+
+    db = get_db()
+    dismiss_issue(db, rule_id, file_pattern, reason)
+    dismissals = get_dismissals(db)
+    db.close()
+
+    # Find the dismissal we just updated
+    for d in dismissals:
+        if d["rule_id"] == rule_id:
+            if d["auto_suppress"]:
+                console.print(f"[yellow]Rule '{rule_id}' auto-suppressed[/yellow] (dismissed {d['count']}x)")
+            else:
+                remaining = 3 - d["count"]
+                console.print(f"[dim]Rule '{rule_id}' dismissed ({d['count']}x). {remaining} more to auto-suppress.[/dim]")
+            break
+
+
+@main.command()
 def serve():
     """Start the DebuggAI MCP server (used internally by Claude Code / Cursor)."""
     from debuggai.mcp_server import main as mcp_main

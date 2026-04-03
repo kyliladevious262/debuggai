@@ -1,0 +1,18 @@
+rules:
+  - id: unbounded-query
+    regex: '\.find\(\s*\{\s*\}\s*\)|\.find\(\s*\)|SELECT\s+\*\s+FROM\s+\w+\s*;?\s*$'
+    languages: [javascript, typescript, python]
+    severity: major
+    category: performance
+    message: "Unbounded database query"
+    description: "Query returns all records without limit. This will slow down as data grows."
+    suggestion: "Add a LIMIT clause or .limit() to the query."
+
+  - id: no-index-hint
+    regex: 'CREATE\s+TABLE.*\);\s*$'
+    languages: [python, javascript, typescript]
+    severity: minor
+    category: performance
+    message: "Table created without indexes"
+    description: "New table has no indexes. Queries on this table may be slow."
+    suggestion: "Add indexes on columns used in WHERE clauses and JOINs."
