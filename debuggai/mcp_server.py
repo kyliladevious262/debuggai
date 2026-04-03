@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     "DebuggAI",
-    version="0.1.0",
+    version="1.0.0",
     description="The universal verification layer for AI-generated software",
 )
 

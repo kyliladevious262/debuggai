@@ -6,6 +6,7 @@
 <p align="center">
   <a href="https://github.com/rish-e/debuggai/blob/main/LICENSE"><img src="https://img.shields.io/github/license/rish-e/debuggai" alt="License"></a>
   <img src="https://img.shields.io/badge/python-3.10+-blue" alt="Python">
+  <img src="https://img.shields.io/badge/version-1.0.0-green" alt="Version">
 </p>
 
 ---
@@ -34,9 +35,10 @@ Then **restart Claude Code** (or Cursor).
 **That's it.** Now just ask Claude:
 
 - *"scan this project for bugs"*
-- *"scan src/app.py for security issues"*  
+- *"scan src/app.py for security issues"*
 - *"verify this code matches: add user authentication with OAuth"*
-- *"check my staged changes before I commit"*
+- *"fix the issues you found"*
+- *"show me scan history"*
 
 Claude will use DebuggAI's tools automatically. No commands to memorize — just describe what you want.
 
@@ -45,23 +47,17 @@ Claude will use DebuggAI's tools automatically. No commands to memorize — just
 Run scans directly from your terminal.
 
 ```bash
-# Go to any project
 cd ~/my-project
 
-# Scan everything
-debuggai scan --no-llm
-
-# Scan a specific file
-debuggai scan --file src/app.py
-
-# Scan what changed since last commit
-debuggai scan --diff HEAD~1
-
-# Scan staged changes (great before committing)
-debuggai scan --staged
-
-# Verify code matches what you asked AI to build
-debuggai verify --intent "add Google OAuth login"
+debuggai scan --no-llm                # Scan everything (no API key needed)
+debuggai scan --file src/app.py       # Scan specific file
+debuggai scan --diff HEAD~1           # Scan what changed since last commit
+debuggai scan --staged                # Scan staged changes before committing
+debuggai verify --intent "add OAuth"  # Verify code matches what you asked AI to build
+debuggai fix                          # Generate fixes for detected issues
+debuggai fix --apply                  # Auto-apply high-confidence fixes
+debuggai history                      # Show quality trends over time
+debuggai dismiss <rule-id>            # Dismiss a false positive
 ```
 
 ---
@@ -78,7 +74,7 @@ AI tools make up packages that don't exist. DebuggAI checks your actual dependen
 ```
 
 ### Security Vulnerabilities
-15 patterns tuned for AI code — XSS, SQL injection, hardcoded secrets, eval, command injection, and more.
+15+ security patterns tuned for AI code — XSS, SQL injection, hardcoded secrets, eval, command injection, insecure deserialization, and more. Framework-aware: won't flag safe patterns like parameterized queries or React JSX escaping.
 
 ```
 !!! [SECURITY] SQL injection vulnerability  src/db.py:17
@@ -103,8 +99,8 @@ export ANTHROPIC_API_KEY=sk-ant-...
 debuggai scan --file src/app.py
 ```
 
-### Intent Verification
-Compares what you asked the AI to build vs. what was actually built. Gives you a **Prompt Fidelity Score**.
+### Intent Verification (Prompt Fidelity Score)
+Compares what you asked the AI to build vs. what was actually built.
 
 ```bash
 debuggai verify --intent "add user auth with Google OAuth" --file src/
@@ -121,16 +117,107 @@ Prompt Fidelity Score: 65/100
 
 ---
 
+## v1.0 Features
+
+### Auto-Fix Engine
+DebuggAI generates fix diffs with confidence scores. Review and apply with one click.
+
+```bash
+debuggai fix                    # Generate fixes, show diffs
+debuggai fix --apply            # Apply all high-confidence fixes
+debuggai fix --min-confidence 0.9  # Only fixes above 90% confidence
+```
+
+```
+Fix 1 confidence: 92%
+  [CRITICAL] SQL injection vulnerability — src/db.py:17
+  Use parameterized query instead of f-string
+  - cursor.execute(f"SELECT * FROM users WHERE id = '{user_id}'")
+  + cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+```
+
+### Framework-Aware Context
+DebuggAI auto-detects your tech stack and adjusts accordingly:
+- **React/Vue/Svelte** detected → innerHTML in JSX auto-escaping recognized, XSS severity adjusted
+- **Django/SQLAlchemy/Prisma** detected → ORM parameterization recognized, SQL injection severity adjusted
+- **Vercel/Netlify** detected → serverless constraints applied
+- **CLI tool** detected → browser-specific rules suppressed
+
+No configuration needed — reads your `package.json`, `requirements.txt`, `vercel.json`, `Dockerfile` automatically.
+
+### Dismissal Memory
+Tired of a false positive? Dismiss it. After 3 dismissals of the same rule, it auto-suppresses permanently.
+
+```bash
+debuggai dismiss nested-loop-on2 --reason "acceptable for small data"
+# "Rule 'nested-loop-on2' dismissed (1x). 2 more to auto-suppress."
+
+debuggai dismiss nested-loop-on2
+# "Rule 'nested-loop-on2' dismissed (2x). 1 more to auto-suppress."
+
+debuggai dismiss nested-loop-on2
+# "Rule 'nested-loop-on2' auto-suppressed (dismissed 3x)"
+```
+
+### Scan History & Quality Tracking
+Every scan is saved to a local SQLite database. Track quality over time.
+
+```bash
+debuggai history
+```
+
+```
+DebuggAI Scan History
+
+  Since last scan: -4 issues, +2 new, -6 fixed
+
+  Timestamp              Issues  Crit  Major Duration
+  ────────────────────── ────── ───── ────── ────────
+  2026-04-03T20:18:27         6     1      5     53ms
+  2026-04-03T20:18:19        10     3      7    134ms
+  2026-04-03T19:30:23        24     1     23    330ms
+```
+
+### Custom YAML Rules
+Define your own rules in Semgrep-style YAML. DebuggAI ships with built-in rule packs for security, performance, and AI patterns.
+
+```yaml
+# .debuggai/rules/my-rules.yaml
+rules:
+  - id: no-console-log
+    regex: 'console\.log\s*\('
+    languages: [javascript, typescript]
+    severity: minor
+    category: ai_pattern
+    message: "console.log left in code"
+    suggestion: "Remove or replace with proper logging library."
+```
+
+Rules are auto-loaded from:
+- `rules/` directory (built-in, ships with DebuggAI)
+- `.debuggai/rules/` in your project (project-specific)
+
+### Smart False Positive Reduction
+DebuggAI automatically skips:
+- Build artifacts (`.vercel/`, `dist/`, `build/`, `node_modules/`)
+- Minified/bundled files (detected by line length heuristics)
+- Safe innerHTML (template literals with no user input)
+- Environment variable usage (`os.getenv`, `process.env`)
+- Parameterized SQL queries (using `?` placeholders)
+- Browser profile directories, vendor code, third-party bundles
+
+---
+
 ## Why DebuggAI?
 
 Traditional linters weren't designed for AI-generated code. They miss what AI specifically gets wrong:
 
 | Problem | How Often in AI Code | DebuggAI Detection |
 |---------|---------------------|-------------------|
-| Hallucinated imports (non-existent packages) | Very common | AST + dependency resolution |
-| XSS vulnerabilities | 2.74x more likely | Pattern + AST analysis |
+| Hallucinated imports | Very common | AST + dependency resolution |
+| XSS vulnerabilities | 2.74x more likely | Pattern + AST + framework context |
 | Excessive I/O operations | 8x more frequent | AST loop analysis |
-| Hardcoded secrets | 1.88x more likely | Regex + entropy detection |
+| Hardcoded secrets | 1.88x more likely | Regex + env var awareness |
 | Missing error handling | 1.75x more frequent | LLM semantic review |
 | Intent mismatches | Universal | Prompt Fidelity scoring |
 
@@ -138,22 +225,19 @@ Traditional linters weren't designed for AI-generated code. They miss what AI sp
 
 ## CLI Reference
 
-### `debuggai setup`
+| Command | Description |
+|---------|-------------|
+| `debuggai setup` | Auto-register MCP server in Claude Code / Cursor |
+| `debuggai init` | Initialize config for a project (auto-detects languages) |
+| `debuggai scan` | Scan code for bugs, security issues, performance problems |
+| `debuggai verify` | Verify code matches a natural language intent |
+| `debuggai fix` | Generate and optionally apply fixes |
+| `debuggai history` | Show scan history and quality trends |
+| `debuggai dismiss` | Dismiss a false positive rule |
+| `debuggai config` | Show current configuration |
+| `debuggai serve` | Start MCP server (used internally) |
 
-Auto-registers DebuggAI as an MCP server in Claude Code or Cursor. Run once.
-
-```bash
-debuggai setup              # Claude Code (default)
-debuggai setup --cursor     # Cursor
-```
-
-### `debuggai init [directory]`
-
-Initialize DebuggAI for a project. Auto-detects languages and creates `.debuggai.yaml`.
-
-### `debuggai scan`
-
-Scan code for AI-generated bugs.
+### `debuggai scan` flags
 
 | Flag | Description |
 |------|-------------|
@@ -167,20 +251,53 @@ Scan code for AI-generated bugs.
 
 Exit codes: 0 = clean, 1 = major issues, 2 = critical issues.
 
-### `debuggai verify`
+### `debuggai fix` flags
 
-Verify code against a natural language intent.
+| Flag | Description |
+|------|-------------|
+| `--file, -f` | File or directory to fix |
+| `--apply` | Auto-apply all fixes |
+| `--min-confidence` | Minimum confidence threshold (default: 0.7) |
+
+### `debuggai verify` flags
 
 | Flag | Description |
 |------|-------------|
 | `--intent, -i` | Intent to verify (required) |
 | `--file, -f` | File or directory to verify against |
 | `--diff, -d` | Git ref to verify against |
-| `--format, -o` | Output format: `terminal`, `markdown`, `json` |
 
-### `debuggai config`
+---
 
-Show current DebuggAI configuration.
+## MCP Server
+
+DebuggAI includes a built-in Python MCP server — no npm or Node.js required.
+
+```bash
+debuggai setup              # Auto-register (recommended)
+```
+
+**Tools** (available to Claude / Cursor automatically):
+
+| Tool | Description |
+|------|-------------|
+| `scan_code` | Scan code for bugs |
+| `verify_intent` | Verify code matches intent |
+| `fix_issues` | Generate and apply fixes |
+| `show_history` | Show scan history and trends |
+| `dismiss_rule` | Dismiss a false positive |
+| `get_report` | Get full JSON report |
+| `init_project` | Initialize config |
+
+**Slash commands** (type these in Claude Code):
+
+| Command | Description |
+|---------|-------------|
+| `/scan` | Scan current project |
+| `/verify` | Verify code matches intent |
+| `/fix` | Generate and apply fixes |
+| `/history` | Show quality trends |
+| `/init` | Initialize config |
 
 ---
 
@@ -232,23 +349,49 @@ debuggai scan --staged --no-llm
 
 ---
 
+## Architecture
+
+```
+debuggai/
+├── engines/
+│   ├── code/           # Code QA Engine
+│   │   ├── imports.py      # Hallucinated import detector
+│   │   ├── security.py     # Security vulnerability scanner
+│   │   ├── performance.py  # Performance anti-pattern detector
+│   │   ├── llm_review.py   # LLM-powered semantic review
+│   │   ├── rules.py        # Custom YAML rule engine
+│   │   └── scanner.py      # Orchestrates all code analyzers
+│   ├── intent/         # Intent Verification Engine
+│   │   ├── capture.py      # Intent capture from CLI/git/files
+│   │   ├── parser.py       # Assertion extraction via LLM
+│   │   └── scorer.py       # Prompt Fidelity scoring
+│   └── fix.py          # Auto-fix generation and application
+├── models/             # Pydantic data models
+├── reports/            # Report generation (JSON, Markdown, terminal)
+├── context.py          # Framework and deployment detection
+├── storage.py          # SQLite history, dismissals, quality tracking
+├── mcp_server.py       # Python MCP server (no npm needed)
+├── cli.py              # Click CLI entry point
+└── orchestrator.py     # Engine coordination + context + storage
+```
+
 ## Supported Languages
 
-| Language | Import Detection | Security Scan | Performance Scan |
-|----------|:---:|:---:|:---:|
-| Python | Yes | Yes | Yes |
-| JavaScript | Yes | Yes | Yes |
-| TypeScript | Yes | Yes | Yes |
-| Go | Planned | Planned | Planned |
-| Rust | Planned | Planned | Planned |
-| Java | Planned | Planned | Planned |
+| Language | Import Detection | Security | Performance | Custom Rules |
+|----------|:---:|:---:|:---:|:---:|
+| Python | Yes | Yes | Yes | Yes |
+| JavaScript | Yes | Yes | Yes | Yes |
+| TypeScript | Yes | Yes | Yes | Yes |
+| Go | Planned | Planned | Planned | Yes |
+| Rust | Planned | Planned | Planned | Yes |
+| Java | Planned | Planned | Planned | Yes |
 
 ## Roadmap
 
-- **v0.1** (current) — Code QA + Intent Verification + CLI + MCP Server
-- **v1.0** — Creative Output QA (video/audio), auto-fix suggestions, GitHub PR comments
-- **v1.5** — Cloud dashboard, team features, quality gates
-- **v2.0** — Autonomous testing agent, self-healing tests, enterprise features
+- **v0.1** — Code QA + Intent Verification + CLI + MCP Server
+- **v1.0** (current) — Auto-fix, framework detection, dismissal memory, scan history, custom YAML rules
+- **v1.5** — Cloud dashboard, team features, GitHub PR integration (GitHub App), quality gates
+- **v2.0** — Deep Analysis Engine (architectural bugs, runtime simulation, domain packs), autonomous testing agent
 
 ## Contributing
 
