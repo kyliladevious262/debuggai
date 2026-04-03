@@ -33,7 +33,16 @@ Traditional linters and test tools weren't designed for AI-generated code. They 
 pip install debuggai
 ```
 
-Requires Python 3.10+.
+Requires Python 3.10+. That's it — no npm, no extra downloads.
+
+### Setup for Claude Code / Cursor (one command)
+
+```bash
+debuggai setup              # Claude Code (default)
+debuggai setup --cursor     # Cursor
+```
+
+This auto-registers DebuggAI as an MCP server. Restart your IDE, then use `/scan`, `/verify`, and `/init` as slash commands.
 
 ## Quick Start
 
@@ -197,20 +206,20 @@ reporting:
 
 ## MCP Server
 
-DebuggAI includes an MCP server for integration with Claude Code, Cursor, and Windsurf.
+DebuggAI includes a built-in Python MCP server — no npm or Node.js required.
 
 ```bash
-cd mcp-server && npm install && npm run build
-```
+# Auto-install (recommended)
+debuggai setup
 
-Add to your MCP config:
+# Or manual config — add to your MCP settings:
+```
 
 ```json
 {
   "mcpServers": {
     "debuggai": {
-      "command": "node",
-      "args": ["/path/to/debuggai/mcp-server/dist/index.js"]
+      "command": "debuggai-mcp"
     }
   }
 }
@@ -223,7 +232,15 @@ Add to your MCP config:
 | `scan_code` | Scan code for AI-generated bugs |
 | `verify_intent` | Verify code matches intent, get Prompt Fidelity Score |
 | `get_report` | Get full JSON report for programmatic analysis |
-| `configure` | Show or initialize DebuggAI config |
+| `init_project` | Initialize DebuggAI config for a project |
+
+**Slash commands** (after `debuggai setup`):
+
+| Command | Description |
+|---------|-------------|
+| `/scan` | Scan current project for bugs |
+| `/verify` | Verify code matches intent |
+| `/init` | Initialize DebuggAI config |
 
 ## CI/CD Integration
 

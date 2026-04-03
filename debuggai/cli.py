@@ -163,5 +163,80 @@ def config():
         console.print(f"    {rule}: {status}")
 
 
+@main.command()
+@click.option("--claude-code", is_flag=True, default=True, help="Install for Claude Code (default)")
+@click.option("--cursor", is_flag=True, help="Install for Cursor")
+def setup(claude_code: bool, cursor: bool):
+    """Auto-install DebuggAI as an MCP server. One command, then use /scan, /verify, /init."""
+    import json as json_mod
+    import shutil
+
+    # Find the debuggai-mcp entry point
+    debuggai_mcp_path = shutil.which("debuggai-mcp")
+    if not debuggai_mcp_path:
+        # Fallback: use python -m
+        python_path = sys.executable
+        mcp_command = python_path
+        mcp_args = ["-m", "debuggai.mcp_server"]
+    else:
+        mcp_command = debuggai_mcp_path
+        mcp_args = []
+
+    # Determine config paths
+    home = Path.home()
+    configs_to_update: list[tuple[str, Path]] = []
+
+    if claude_code or (not cursor):
+        claude_config = home / ".claude" / "settings.json"
+        configs_to_update.append(("Claude Code", claude_config))
+
+    if cursor:
+        cursor_config = home / ".cursor" / "mcp.json"
+        configs_to_update.append(("Cursor", cursor_config))
+
+    mcp_entry = {
+        "command": mcp_command,
+        "args": mcp_args,
+    }
+
+    for name, config_path in configs_to_update:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        # Load existing config
+        existing = {}
+        if config_path.exists():
+            try:
+                existing = json_mod.loads(config_path.read_text())
+            except json_mod.JSONDecodeError:
+                existing = {}
+
+        # Add/update DebuggAI MCP server
+        if "mcpServers" not in existing:
+            existing["mcpServers"] = {}
+
+        existing["mcpServers"]["debuggai"] = mcp_entry
+
+        config_path.write_text(json_mod.dumps(existing, indent=2) + "\n")
+        console.print(f"[green]Installed for {name}[/green] -> {config_path}")
+
+    console.print()
+    console.print("[bold]Setup complete![/bold]")
+    console.print()
+    console.print("Restart Claude Code / Cursor, then use these slash commands:")
+    console.print("  [bold]/scan[/bold]     — Scan code for AI-generated bugs")
+    console.print("  [bold]/verify[/bold]   — Verify code matches intent")
+    console.print("  [bold]/init[/bold]     — Initialize DebuggAI config")
+    console.print()
+    console.print("[dim]Or use the tools directly: scan_code, verify_intent, init_project[/dim]")
+
+
+@main.command()
+def serve():
+    """Start the DebuggAI MCP server (used internally by Claude Code / Cursor)."""
+    from debuggai.mcp_server import main as mcp_main
+
+    mcp_main()
+
+
 if __name__ == "__main__":
     main()
