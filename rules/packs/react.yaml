@@ -1,0 +1,31 @@
+rules:
+  - id: react-setstate-in-render
+    regex: '(?:setState|set[A-Z]\w+)\s*\('
+    regex-not: 'useEffect|useCallback|useMemo|onClick|onChange|onSubmit|handler|Handler'
+    languages: [javascript, typescript]
+    severity: major
+    category: performance
+    message: "Possible setState during render"
+    description: "Setting state outside of effects or handlers can cause infinite re-render loops."
+    suggestion: "Move state updates into useEffect, event handlers, or useCallback."
+    files: ["*.tsx", "*.jsx"]
+
+  - id: react-array-index-key
+    regex: '\.map\s*\([^)]*,\s*(?:index|i|idx)\s*\).*key\s*=\s*\{?\s*(?:index|i|idx)'
+    languages: [javascript, typescript]
+    severity: minor
+    category: performance
+    message: "Array index used as React key"
+    description: "Using array index as key causes incorrect component reuse when the list is reordered, filtered, or items are added/removed."
+    suggestion: "Use a stable unique identifier (e.g., item.id) as the key instead of the array index."
+    files: ["*.tsx", "*.jsx"]
+
+  - id: react-missing-dep-array
+    regex: 'useEffect\s*\(\s*\(\)\s*=>\s*\{[^}]+\}\s*\)\s*;'
+    languages: [javascript, typescript]
+    severity: major
+    category: performance
+    message: "useEffect without dependency array"
+    description: "useEffect without a dependency array runs on every render, which is almost never what you want."
+    suggestion: "Add a dependency array: useEffect(() => { ... }, [deps])"
+    files: ["*.tsx", "*.jsx"]

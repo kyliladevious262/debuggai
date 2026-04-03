@@ -223,6 +223,37 @@ Traditional linters weren't designed for AI-generated code. They miss what AI sp
 
 ---
 
+## Deep Analysis (v2.0)
+
+Go beyond file-by-file scanning. Deep analysis understands your entire project — deployment model, runtime behavior, architectural patterns — and finds system-level bugs that no linter can catch.
+
+```bash
+debuggai deep                       # Full analysis
+debuggai deep --focus security      # Security architecture
+debuggai deep --focus performance   # Runtime behavior + leaks
+debuggai deep --focus deployment    # Deployment model fit
+debuggai deep --no-llm              # Static analysis only (faster, free)
+```
+
+**What it finds that `debuggai scan` can't:**
+
+| Category | Example |
+|----------|---------|
+| Serverless state | In-memory rate limiter resets on cold start |
+| CORS abuse | `origin: *` lets any website drain your paid API |
+| Memory leaks | Blob URLs never revoked, event listeners accumulating |
+| Race conditions | Button clickable during async processing |
+| Timeout mismatches | 600s timeout on Vercel (max 30s) |
+| Missing safeguards | File upload with no size limit, API call with no timeout |
+
+**How it works:**
+1. Indexes your entire project — structure, dependencies, config files, deployment model
+2. Runs static architectural analysis (serverless anti-patterns, runtime behavior, resource lifecycle)
+3. Applies domain-specific rule packs (serverless, browser, React, API)
+4. Optionally sends full project context to Claude for holistic LLM review
+
+---
+
 ## CLI Reference
 
 | Command | Description |
@@ -389,9 +420,10 @@ debuggai/
 ## Roadmap
 
 - **v0.1** — Code QA + Intent Verification + CLI + MCP Server
-- **v1.0** (current) — Auto-fix, framework detection, dismissal memory, scan history, custom YAML rules
-- **v1.5** — Cloud dashboard, team features, GitHub PR integration (GitHub App), quality gates
-- **v2.0** — Deep Analysis Engine (architectural bugs, runtime simulation, domain packs), autonomous testing agent
+- **v1.0** — Auto-fix, framework detection, dismissal memory, scan history, custom YAML rules
+- **v2.0** (current) — Deep Analysis Engine, architectural anti-patterns, runtime behavior analysis, domain rule packs
+- **v2.5** — Cloud dashboard, team features, GitHub PR integration (GitHub App), quality gates
+- **v3.0** — Autonomous testing agent (Playwright + LLM), self-healing tests
 
 ## Contributing
 

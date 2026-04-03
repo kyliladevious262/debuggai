@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP(
     "DebuggAI",
-    version="1.0.0",
+    version="2.0.0",
     description="The universal verification layer for AI-generated software",
 )
 
@@ -244,6 +244,39 @@ def dismiss_rule(rule_id: str, file_pattern: str | None = None, reason: str = ""
     return f"Rule '{rule_id}' dismissed."
 
 
+@mcp.tool()
+def deep_analysis(
+    target: str = ".",
+    focus: str = "all",
+    no_llm: bool = False,
+) -> str:
+    """Run deep architectural analysis — finds system-level bugs that pattern matching misses.
+
+    This analyzes the entire project holistically: deployment model, runtime behavior,
+    memory leaks, race conditions, architectural anti-patterns, and domain-specific issues.
+
+    Args:
+        target: Project directory to analyze (defaults to current directory)
+        focus: Analysis focus — "all", "security", "performance", "deployment"
+        no_llm: Skip LLM holistic review for faster/cheaper results
+    """
+    from debuggai.engines.deep.engine import run_deep_analysis
+    from debuggai.reports.generator import format_markdown
+
+    report = run_deep_analysis(
+        project_dir=str(Path(target).resolve()) if target != "." else None,
+        focus=focus,
+        use_llm=not no_llm,
+    )
+
+    result = ""
+    if report.architecture_summary:
+        result += f"## Architecture\n{report.architecture_summary}\n\n"
+
+    result += format_markdown(report)
+    return result
+
+
 # ─── Prompts (slash commands) ─────────────────────────────────────────────────
 
 
@@ -295,6 +328,17 @@ def history() -> str:
     return (
         "Run the show_history tool. Present the results as a clean table "
         "and highlight any trends (improving or degrading quality)."
+    )
+
+
+@mcp.prompt()
+def deep(target: str = ".", focus: str = "all") -> str:
+    """Run deep architectural analysis — finds system-level bugs that pattern matching misses."""
+    return (
+        f'Run the deep_analysis tool with target="{target}" and focus="{focus}". '
+        "Present the architecture summary first, then group findings by category "
+        "(architectural, runtime, domain-specific). For each finding, explain the "
+        "causal chain — why it's a bug, what happens at runtime, and how to fix it."
     )
 
 

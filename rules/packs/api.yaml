@@ -1,0 +1,39 @@
+rules:
+  - id: api-no-rate-limit
+    regex: '(?:app\.post|app\.get|router\.post|router\.get|export\s+(?:async\s+)?function\s+(?:GET|POST|PUT|DELETE))'
+    regex-not: 'rateLimit|rate_limit|throttle|Throttle|limiter|Limiter'
+    languages: [javascript, typescript, python]
+    severity: major
+    category: security
+    message: "API endpoint without rate limiting"
+    description: "Public API endpoint has no rate limiting. Vulnerable to abuse and denial-of-service."
+    suggestion: "Add rate limiting middleware (express-rate-limit, slowapi, or Upstash Ratelimit)."
+
+  - id: api-no-input-validation
+    regex: '(?:req\.body|req\.query|req\.params|request\.json|request\.form)'
+    regex-not: 'validate|Validate|schema|Schema|zod|yup|joi|pydantic|TypeAdapter'
+    languages: [javascript, typescript, python]
+    severity: major
+    category: security
+    message: "Request input used without validation"
+    description: "User input from request body/query/params accessed without schema validation."
+    suggestion: "Validate with Zod, Yup, Joi (JS) or Pydantic (Python) before using."
+
+  - id: api-error-leaks-stack
+    regex: '(?:res\.(?:json|send)\s*\(\s*(?:err|error)|return\s+(?:Response|JsonResponse)\s*\(.*(?:str\(e\)|error\.message|traceback))'
+    languages: [javascript, typescript, python]
+    severity: major
+    category: security
+    message: "Error response may leak stack trace"
+    description: "Error details sent to client may expose internal paths, stack traces, or sensitive info."
+    suggestion: "Return generic error messages to clients. Log full details server-side only."
+
+  - id: api-no-auth-check
+    regex: '(?:app\.(?:post|put|delete|patch)|router\.(?:post|put|delete|patch))\s*\(\s*[\'"][^\'"]+'
+    regex-not: 'auth|Auth|middleware|protect|guard|verify|token|session|passport|jwt'
+    languages: [javascript, typescript]
+    severity: major
+    category: security
+    message: "Mutating endpoint without auth middleware"
+    description: "POST/PUT/DELETE endpoint doesn't appear to have authentication middleware."
+    suggestion: "Add authentication middleware to protect mutating endpoints."

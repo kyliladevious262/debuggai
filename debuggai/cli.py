@@ -363,6 +363,54 @@ def dismiss(rule_id: str, file_pattern: str | None, reason: str):
 
 
 @main.command()
+@click.argument("directory", default=".")
+@click.option("--focus", "-f", type=click.Choice(["all", "security", "performance", "deployment"]), default="all")
+@click.option("--no-llm", is_flag=True, help="Skip LLM holistic review (faster, cheaper)")
+@click.option("--format", "-o", "output_format", type=click.Choice(["terminal", "markdown", "json"]), default="terminal")
+def deep(directory: str, focus: str, no_llm: bool, output_format: str):
+    """Deep architectural analysis — finds system-level bugs that pattern matching misses."""
+    from debuggai.engines.deep.engine import run_deep_analysis
+    from debuggai.reports.generator import format_json, format_markdown, format_terminal
+
+    project_dir = str(Path(directory).resolve())
+    console.print(f"[bold blue]Deep Analysis[/bold blue] — {Path(project_dir).name}")
+    console.print(f"[dim]Focus: {focus} | LLM: {'on' if not no_llm else 'off'}[/dim]\n")
+
+    with console.status("[bold blue]Indexing project...[/bold blue]"):
+        report = run_deep_analysis(
+            project_dir=project_dir,
+            focus=focus,
+            use_llm=not no_llm,
+        )
+
+    # Show architecture summary
+    if report.architecture_summary:
+        console.print("[bold]Architecture[/bold]")
+        console.print(f"[dim]{report.architecture_summary[:500]}[/dim]\n")
+
+    if report.project_context:
+        ctx = report.project_context
+        console.print(f"  Deployment: {ctx.get('deployment', '?')} | "
+                      f"Frameworks: {', '.join(ctx.get('frameworks', [])) or 'none'} | "
+                      f"Files: {ctx.get('total_files', '?')} | "
+                      f"Lines: {ctx.get('total_lines', '?')}")
+        console.print()
+
+    if output_format == "json":
+        click.echo(format_json(report))
+    elif output_format == "markdown":
+        click.echo(format_markdown(report))
+    else:
+        console.print(format_terminal(report))
+
+    if report.summary.critical > 0:
+        sys.exit(2)
+    elif report.summary.major > 0:
+        sys.exit(1)
+    sys.exit(0)
+
+
+@main.command()
 def serve():
     """Start the DebuggAI MCP server (used internally by Claude Code / Cursor)."""
     from debuggai.mcp_server import main as mcp_main

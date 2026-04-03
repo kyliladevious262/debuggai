@@ -5,6 +5,37 @@ All notable changes to DebuggAI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-04-03
+
+### Added
+
+- **Deep Analysis Engine** — holistic architectural analysis that understands entire projects
+  - `debuggai deep` command with `--focus` (all, security, performance, deployment)
+  - `deep_analysis` MCP tool + `/deep` slash command
+  - **Layer 1: Project Indexer** — builds dependency graph, extracts structure, generates architecture summary via LLM
+  - **Layer 2: Architectural Anti-Pattern Detection**:
+    - Stateful code in serverless environments (in-memory maps/sets that reset on cold start)
+    - CORS wildcard enabling API abuse
+    - Missing cache headers on large assets (WASM, fonts)
+    - Timeout values exceeding platform limits (Vercel 30s, Lambda 900s)
+    - Recursive serverless invocations (DoW attack risk)
+  - **Layer 3: Runtime Behavior Analysis**:
+    - Memory leaks: addEventListener without removeEventListener, blob URLs without revokeObjectURL, useEffect without cleanup
+    - Race conditions: async handlers without re-entry guards
+    - Missing safeguards: API calls without timeout, file uploads without size validation
+  - **Layer 4: Domain-Specific Rule Packs** (14 new rules across 4 packs):
+    - `serverless.yaml` — global state, connection reuse, /tmp cleanup
+    - `browser.yaml` — AbortController, DOM ready, localStorage error handling
+    - `react.yaml` — setState in render, array index keys, missing dep arrays
+    - `api.yaml` — rate limiting, input validation, error leaking, auth checks
+  - **Holistic LLM Review** — sends full project context to Claude for system-level analysis (optional, requires API key)
+
+### Changed
+
+- Report model now includes `architecture_summary` and `project_context` fields
+- Serverless state detection scoped to server-side files only (api/, functions/, etc.)
+- Version bumped to 2.0.0
+
 ## [1.0.0] - 2026-04-03
 
 ### Added

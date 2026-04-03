@@ -1,0 +1,30 @@
+rules:
+  - id: browser-no-abort-controller
+    regex: 'new\s+(?:XMLHttpRequest|fetch)\s*\('
+    regex-not: 'AbortController|signal'
+    languages: [javascript, typescript]
+    severity: minor
+    category: logic
+    message: "HTTP request without AbortController"
+    description: "Network request has no abort signal. User can't cancel long-running requests, and component unmount won't cancel in-flight requests."
+    suggestion: "Use AbortController: const controller = new AbortController(); fetch(url, { signal: controller.signal })"
+
+  - id: browser-document-ready-check
+    regex: 'document\.getElementById|document\.querySelector'
+    regex-not: 'DOMContentLoaded|addEventListener|useEffect|componentDidMount'
+    languages: [javascript, typescript]
+    severity: minor
+    category: logic
+    message: "DOM query may run before DOM is ready"
+    description: "Document query without waiting for DOMContentLoaded. Element may not exist yet if script runs in <head>."
+    suggestion: "Wrap in DOMContentLoaded listener, or place script at end of <body>."
+
+  - id: browser-localstorage-no-try
+    regex: 'localStorage\.(?:getItem|setItem|removeItem)'
+    regex-not: 'try|catch'
+    languages: [javascript, typescript]
+    severity: minor
+    category: logic
+    message: "localStorage access without try/catch"
+    description: "localStorage can throw in private browsing, when storage is full, or when disabled. Always wrap in try/catch."
+    suggestion: "Wrap localStorage calls in try/catch to handle storage restrictions gracefully."

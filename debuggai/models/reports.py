@@ -27,13 +27,15 @@ class ReportSummary(BaseModel):
 class Report(BaseModel):
     """Complete DebuggAI analysis report."""
 
-    version: str = "0.1.0"
+    version: str = "1.0.0"
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     project: Optional[str] = None
     target: str = Field(description="What was scanned (file path, diff ref, etc.)")
     issues: list[Issue] = Field(default_factory=list)
     intent: Optional[IntentSpec] = None
     summary: ReportSummary = Field(default_factory=ReportSummary)
+    architecture_summary: Optional[str] = None
+    project_context: Optional[dict] = None
 
     def build_summary(self) -> ReportSummary:
         """Compute summary from issues and intent."""

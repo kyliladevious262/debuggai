@@ -1,0 +1,36 @@
+rules:
+  - id: serverless-global-map
+    regex: '^(?:let|var)\s+\w+\s*=\s*new\s+Map'
+    languages: [javascript, typescript]
+    severity: critical
+    category: logic
+    message: "In-memory Map in serverless — resets on cold start"
+    description: "Module-level Map will lose all data when the serverless container recycles. Use Redis, DynamoDB, or Vercel KV."
+    suggestion: "Use external storage: Upstash Redis, Vercel KV, or DynamoDB."
+
+  - id: serverless-global-set
+    regex: '^(?:let|var)\s+\w+\s*=\s*new\s+Set'
+    languages: [javascript, typescript]
+    severity: critical
+    category: logic
+    message: "In-memory Set in serverless — resets on cold start"
+    description: "Module-level Set will lose all data on cold start."
+    suggestion: "Use external storage instead."
+
+  - id: serverless-connection-no-reuse
+    regex: 'new\s+(?:Client|Pool|Connection|MongoClient)\s*\('
+    languages: [javascript, typescript, python]
+    severity: major
+    category: performance
+    message: "Database connection created inside handler"
+    description: "Creating a new DB connection per request adds latency. Move connection to module scope for reuse across warm invocations."
+    suggestion: "Initialize the client at module level, outside the handler function."
+
+  - id: lambda-tmp-cleanup
+    regex: '/tmp/'
+    languages: [javascript, typescript, python]
+    severity: minor
+    category: logic
+    message: "Writing to /tmp on serverless"
+    description: "/tmp on Lambda/Vercel has limited space (512MB) and persists between warm invocations. Clean up after use."
+    suggestion: "Always delete temp files after processing to avoid filling /tmp across invocations."
