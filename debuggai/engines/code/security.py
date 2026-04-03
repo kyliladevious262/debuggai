@@ -81,10 +81,13 @@ PYTHON_PATTERNS: list[tuple[re.Pattern, Severity, str, str, str, str]] = [
 
 JS_TS_PATTERNS: list[tuple[re.Pattern, Severity, str, str, str, str]] = [
     (
-        re.compile(r"""(?:innerHTML|outerHTML)\s*=\s*(?!['"]<)"""),
+        # Only flag innerHTML when assigned a variable or expression, not string/template literals
+        # This catches: innerHTML = userInput, innerHTML = getData()
+        # This skips: innerHTML = '', innerHTML = `<div>...`, innerHTML = '<tag>'
+        re.compile(r"""\.innerHTML\s*=\s*[a-zA-Z_$]"""),
         Severity.CRITICAL,
         "XSS vulnerability (innerHTML)",
-        "Setting innerHTML with dynamic content enables cross-site scripting. AI code commonly uses innerHTML for quick DOM updates.",
+        "Setting innerHTML with a variable enables cross-site scripting if the value contains user input.",
         "Use textContent for text, or sanitize with DOMPurify.sanitize() before setting innerHTML.",
         "xss-innerhtml",
     ),
@@ -166,6 +169,15 @@ def scan_security(file_path: str, content: str) -> list[Issue]:
 
         for pattern, severity, title, desc, suggestion, rule_id in patterns:
             if pattern.search(line):
+                # Skip secret/password rules when the value comes from env vars (that's correct usage)
+                if rule_id in ("hardcoded-secret", "hardcoded-password"):
+                    if any(safe in stripped for safe in [
+                        "os.getenv", "os.environ", "process.env",
+                        "getenv(", "environ[", "environ.get",
+                        "config(", "Config(",
+                    ]):
+                        continue
+
                 # Avoid duplicate issues on the same line with the same rule
                 issue_id = f"sec-{rule_id}-{file_path}:{line_num}"
                 if not any(i.id == issue_id for i in issues):

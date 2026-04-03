@@ -86,7 +86,7 @@ def _detect_io_in_loops_python(
 ) -> None:
     """Detect I/O operations inside loops."""
     io_functions = {
-        "open", "read", "write", "print",
+        "open", "read", "write",
         "requests.get", "requests.post", "requests.put", "requests.delete",
         "urllib.request.urlopen", "httpx.get", "httpx.post",
     }

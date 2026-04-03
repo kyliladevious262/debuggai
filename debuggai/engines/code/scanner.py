@@ -19,6 +19,17 @@ SUPPORTED_EXTENSIONS = {
     ".go", ".rs", ".java", ".rb", ".php", ".swift", ".kt",
 }
 
+# Directories that should always be skipped — build artifacts, vendored code, bundles
+ALWAYS_IGNORE_DIRS = {
+    "node_modules", "__pycache__", ".venv", "venv", ".git",
+    ".vercel", ".next", ".nuxt", ".output",
+    "dist", "build", "out", ".cache",
+    "vendor", "third_party", "third-party",
+    ".tox", ".mypy_cache", ".ruff_cache", ".pytest_cache",
+    "coverage", ".nyc_output",
+    "eggs", "*.egg-info",
+}
+
 
 def scan_file(
     file_path: str,
@@ -31,6 +42,13 @@ def scan_file(
     ext = Path(file_path).suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
         return []
+
+    # Skip minified/bundled files — if average line length > 500 chars, it's not human-written
+    lines = content.split("\n")
+    if len(lines) > 0:
+        avg_line_len = len(content) / len(lines)
+        if avg_line_len > 500 and len(lines) < 50:
+            return []
 
     issues: list[Issue] = []
 
@@ -148,10 +166,21 @@ def _should_ignore(file_path: str, ignore_patterns: list[str]) -> bool:
     """Check if a file should be ignored based on patterns."""
     from fnmatch import fnmatch
 
+    # Always skip build artifacts, vendored code, bundles
+    parts = Path(file_path).parts
+    for part in parts:
+        if part in ALWAYS_IGNORE_DIRS:
+            return True
+
+    # Skip minified/bundled files (single-line JS files over 1000 chars are likely bundles)
+    if Path(file_path).suffix.lower() in {".js", ".cjs", ".mjs"}:
+        base = Path(file_path).stem.lower()
+        if any(tag in base for tag in [".min", "-min", "bundle", "vendor", "chunk", "core"]):
+            return True
+
     for pattern in ignore_patterns:
         if fnmatch(file_path, pattern):
             return True
-        # Also check if any path component matches
         if "/" in pattern or pattern.endswith("/"):
             clean = pattern.rstrip("/")
             if clean in file_path:
