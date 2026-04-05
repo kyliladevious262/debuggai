@@ -502,7 +502,12 @@ def _check_missing_safeguards(index: ProjectIndex) -> list[Issue]:
 
         # 1. External API calls without timeout
         for i, line in enumerate(lines, 1):
-            if re.search(r'(?:fetch|axios\.\w+|requests\.\w+|httpx\.\w+|urllib)', line):
+            stripped = line.strip()
+            # Skip comments and string-only lines
+            if stripped.startswith(("#", "//", "*", '"', "'")):
+                continue
+            # Match actual HTTP call patterns, not .fetchone()/.fetchall() or string mentions
+            if re.search(r'(?:(?<!\.)fetch\s*\(|axios\.\w+\s*\(|requests\.\w+\s*\(|httpx\.\w+\s*\(|urllib\.request)', line) and not re.search(r'\.fetch(?:one|all|many)\s*\(', line):
                 # Check if timeout is set nearby
                 context = "\n".join(lines[max(0, i-3):min(len(lines), i+5)])
                 if "timeout" not in context.lower():

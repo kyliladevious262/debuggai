@@ -30,10 +30,18 @@ UNIVERSAL_PATTERNS: list[tuple[re.Pattern, Severity, str, str, str, str]] = [
 
 PYTHON_PATTERNS: list[tuple[re.Pattern, Severity, str, str, str, str]] = [
     (
-        re.compile(r"""(?:execute|executemany)\s*\(\s*(?:f['"]|['"].*?%s|['"].*?\+|['"].*?\.format)"""),
+        re.compile(r"""(?:execute|executemany)\s*\(\s*(?:f['"]|['"].*?%s|['"].*?\.format)"""),
         Severity.CRITICAL,
         "SQL injection vulnerability",
         "SQL query built with string interpolation/concatenation instead of parameterized queries.",
+        "Use parameterized queries: cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))",
+        "sql-injection",
+    ),
+    (
+        re.compile(r"""(?:execute|executemany)\s*\(\s*['"].*?['"]\s*\+\s*(?!['"\d])"""),
+        Severity.CRITICAL,
+        "SQL injection vulnerability (string concatenation)",
+        "SQL query built with string concatenation. User input can alter the query structure.",
         "Use parameterized queries: cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))",
         "sql-injection",
     ),
