@@ -354,40 +354,130 @@ def persona_test(
 
 
 @mcp.tool()
-def live_persona_test(
+def start_persona_session(
     url: str,
     target: str = ".",
     persona_name: str | None = None,
 ) -> str:
-    """Test a live website from the customer's perspective. Opens a real browser, navigates as the persona, and reports the experience.
+    """Start a live persona testing session. Opens a real browser and navigates to the URL.
 
-    The agent role-plays as a specific user persona, evaluating each page for clarity,
-    friction, and usability — not just whether buttons work, but whether the EXPERIENCE
-    makes sense for that type of user.
+    This is FREE — uses your existing Claude Code tokens, no API key needed.
+
+    After calling this, you'll receive a screenshot and page info. Evaluate it as the persona,
+    then call execute_persona_action() with what the persona would do next. Repeat until the
+    persona completes their task or gives up. Finally call end_persona_session() for the report.
+
+    The loop: start_persona_session → [evaluate screenshot → execute_persona_action] × N → end_persona_session
 
     Args:
-        url: The URL to test (e.g., http://localhost:3000 or https://mysite.com)
-        target: Project directory for persona discovery (defaults to cwd)
-        persona_name: Specific persona to test as (or discovers from codebase if not specified)
+        url: The URL to test (e.g., http://localhost:3000)
+        target: Project directory for persona discovery
+        persona_name: Persona to test as (discovers from codebase if not specified)
     """
-    from debuggai.engines.persona.engine import run_live_persona_test
+    from debuggai.engines.persona.discover import discover_personas
+    from debuggai.engines.persona.agent import start_session
 
-    try:
-        project_dir = str(Path(target).resolve()) if target != "." else None
-        profile, reports = run_live_persona_test(
-            url=url, project_dir=project_dir, persona_name=persona_name,
-        )
-    except RuntimeError as e:
-        return f"Error: {e}"
+    project_dir = str(Path(target).resolve()) if target != "." else str(Path.cwd())
+    profile = discover_personas(project_dir)
 
-    result = f"## Live Experience Test — {url}\n\n"
-    result += f"**Personas tested:** {', '.join(p.name for p in profile.personas)}\n\n"
+    # Pick persona
+    persona = profile.personas[0] if profile.personas else None
+    if persona_name:
+        matching = [p for p in profile.personas if persona_name.lower() in p.name.lower()]
+        if matching:
+            persona = matching[0]
 
-    for report in reports:
-        result += report.format_markdown()
-        result += "\n---\n\n"
+    if not persona:
+        return "No personas discovered. Specify one with persona_name."
 
-    return result
+    result = start_session(
+        url=url,
+        persona_name=persona.name,
+        persona_description=persona.description,
+        persona_tech_level=persona.tech_level,
+        persona_goal=persona.goals[0] if persona.goals else "Explore the application",
+    )
+
+    if result.get("error"):
+        return f"Error: {result['error']}"
+
+    # Format for Claude Code to evaluate
+    output = f"## Live Persona Session Started\n\n"
+    output += f"**Persona:** {persona.name} ({persona.tech_level})\n"
+    output += f"**Goal:** {persona.goals[0] if persona.goals else 'Explore'}\n"
+    output += f"**URL:** {url}\n"
+    output += f"**Page:** {result.get('title', '?')}\n\n"
+    output += f"**Interactive elements:** {', '.join(result.get('interactive_elements', [])[:15])}\n\n"
+    output += f"**Visible text excerpt:** {result.get('visible_text', '')[:500]}\n\n"
+    output += "Now evaluate this page AS the persona. What would they see? Is it clear? Any friction?\n"
+    output += "Then call execute_persona_action() with the persona's next action."
+
+    return [
+        {"type": "text", "text": output},
+        {"type": "image", "data": result.get("screenshot_base64", ""), "mimeType": "image/png"},
+    ]
+
+
+@mcp.tool()
+def execute_persona_action(
+    action: str,
+    target: str = "",
+    feeling: str = "smooth",
+    observation: str = "",
+    friction: str = "",
+    reasoning: str = "",
+) -> str:
+    """Execute the persona's next action and capture the new page state.
+
+    Call this after evaluating a screenshot from the persona's perspective.
+    Returns a new screenshot for you to evaluate again.
+
+    Args:
+        action: What the persona does — click, type, scroll, back, done (task complete), give_up (too frustrated)
+        target: What to click or type (element text, button label, or "text in field_name")
+        feeling: How the persona felt about the page — smooth, confused, frustrated, lost
+        observation: What the persona noticed on the page
+        friction: Any friction point (or empty if smooth)
+        reasoning: Why the persona chose this action
+    """
+    from debuggai.engines.persona.agent import execute_persona_action as _execute
+
+    result = _execute(
+        action=action, target=target, feeling=feeling,
+        observation=observation, friction=friction or None, reasoning=reasoning,
+    )
+
+    if result.get("error"):
+        return f"Error: {result['error']}"
+
+    # Terminal actions
+    if result.get("status") in ("done", "give_up"):
+        return f"Persona action: {result['status']}. Call end_persona_session() to get the experience report."
+
+    output = f"**Step {result.get('step', '?')}** — Action: {action} '{target}'\n"
+    output += f"**Page:** {result.get('title', '?')} ({result.get('url', '')})\n"
+    output += f"**Action succeeded:** {result.get('action_success', '?')}\n\n"
+    output += f"**Interactive elements:** {', '.join(result.get('interactive_elements', [])[:15])}\n\n"
+    output += f"**Visible text:** {result.get('visible_text', '')[:500]}\n\n"
+    output += "Evaluate this page AS the persona, then call execute_persona_action() again."
+
+    return [
+        {"type": "text", "text": output},
+        {"type": "image", "data": result.get("screenshot_base64", ""), "mimeType": "image/png"},
+    ]
+
+
+@mcp.tool()
+def end_persona_session() -> str:
+    """End the live persona testing session and get the experience report.
+
+    Call this after the persona completes their task (action: done) or gives up (action: give_up).
+    Returns a full experience report with step-by-step journey, friction points, and score.
+    """
+    from debuggai.engines.persona.agent import end_session
+
+    report = end_session()
+    return report.format_markdown()
 
 
 # ─── Prompts (slash commands) ─────────────────────────────────────────────────
@@ -464,6 +554,31 @@ def persona(target: str = ".") -> str:
         f'Then run the persona_test tool with target="{target}" to find UX issues. '
         "Group findings by persona. For each finding, explain why THIS persona would be affected "
         "and what the impact is from THEIR perspective — not a developer's."
+    )
+
+
+@mcp.prompt()
+def persona_live(url: str, target: str = ".") -> str:
+    """Test a live website from the customer's perspective — FREE, uses your existing Claude Code tokens.
+
+    Opens a real browser, shows you screenshots, and you evaluate each page as the persona.
+    """
+    return (
+        f'Call start_persona_session with url="{url}" and target="{target}". '
+        "This opens a browser and returns a screenshot.\n\n"
+        "For each screenshot:\n"
+        "1. Look at the screenshot as the persona (their tech level, goals, pain points)\n"
+        "2. Evaluate: is the page clear? Is there friction? What would they do next?\n"
+        "3. Call execute_persona_action with:\n"
+        "   - action: click/type/scroll/back/done/give_up\n"
+        "   - target: what to interact with\n"
+        "   - feeling: smooth/confused/frustrated/lost\n"
+        "   - observation: what you saw\n"
+        "   - friction: any issues (or empty)\n"
+        "4. Repeat until the persona completes their task or gives up\n"
+        "5. Call end_persona_session to get the experience report\n\n"
+        "Stay in character as the persona throughout. Think about what THEY would notice, "
+        "not what a developer would notice."
     )
 
 
