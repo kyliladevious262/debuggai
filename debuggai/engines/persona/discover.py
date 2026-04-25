@@ -299,7 +299,7 @@ def _discover_with_llm(root: Path, signals: dict, api_key: str) -> list[Persona]
         response = client.messages.create(
             model=os.environ.get("DEBUGGAI_MODEL", "claude-sonnet-4-20250514"),
             max_tokens=2048,
-            system="""You are DebuggAI's persona discovery engine. Given signals from a codebase,
+            system=[{"type": "text", "cache_control": {"type": "ephemeral"}, "text": """You are DebuggAI's persona discovery engine. Given signals from a codebase,
 identify 2-4 user personas (ICP). For each persona, return a JSON object with:
 - name: persona name (e.g., "Content Creator", "Enterprise Admin")
 - role: "primary" | "secondary" | "tertiary"
@@ -311,7 +311,7 @@ identify 2-4 user personas (ICP). For each persona, return a JSON object with:
 - key_flows: list of 3-5 user flows they'd attempt (e.g., "upload video", "view dashboard")
 
 Be specific to THIS app. Don't generate generic personas.
-Return ONLY a JSON array of persona objects.""",
+Return ONLY a JSON array of persona objects."""}],
             messages=[{"role": "user", "content": f"""Discover user personas for this project:
 
 Project: {root.name}

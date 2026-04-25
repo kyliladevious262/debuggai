@@ -80,7 +80,7 @@ Return ONLY a JSON array of issues."""
     response = client.messages.create(
         model=os.environ.get("DEBUGGAI_MODEL", "claude-sonnet-4-20250514"),
         max_tokens=8192,
-        system=system_prompt,
+        system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": user_msg}],
     )
 

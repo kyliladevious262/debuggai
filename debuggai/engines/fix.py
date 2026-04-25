@@ -45,7 +45,7 @@ def generate_fix(
     response = client.messages.create(
         model=os.environ.get("DEBUGGAI_MODEL", "claude-sonnet-4-20250514"),
         max_tokens=2048,
-        system="""You are DebuggAI's auto-fix engine. Given a code issue and its surrounding context,
+        system=[{"type": "text", "cache_control": {"type": "ephemeral"}, "text": """You are DebuggAI's auto-fix engine. Given a code issue and its surrounding context,
 generate a minimal, correct fix. Return ONLY a JSON object with:
 - old_code: the exact lines to replace (as they appear in the file, no line numbers)
 - new_code: the replacement code
@@ -57,7 +57,7 @@ Rules:
 - old_code must be an exact substring of the file content.
 - Preserve indentation exactly.
 - If you're not confident, set confidence below 0.5.
-- Return ONLY the JSON object, no markdown.""",
+- Return ONLY the JSON object, no markdown."""}],
         messages=[{
             "role": "user",
             "content": f"""Fix this issue:

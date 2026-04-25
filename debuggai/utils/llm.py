@@ -111,7 +111,7 @@ Return ONLY a JSON array of issues found. Return [] if no issues."""
         response = client.messages.create(
             model=get_model(),
             max_tokens=4096,
-            system=system_prompt,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_msg}],
         )
         text = response.content[0].text
@@ -160,7 +160,7 @@ Return ONLY a JSON array of assertions."""
         response = client.messages.create(
             model=get_model(),
             max_tokens=2048,
-            system=system_prompt,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_msg}],
         )
         return _parse_json_response(response.content[0].text)
@@ -211,7 +211,7 @@ Return ONLY a JSON object with status, evidence, location, score."""
         response = client.messages.create(
             model=get_model(),
             max_tokens=1024,
-            system=system_prompt,
+            system=[{"type": "text", "text": system_prompt, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user_msg}],
         )
         return _parse_json_response(response.content[0].text)
